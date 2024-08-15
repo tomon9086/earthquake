@@ -4,18 +4,19 @@ use std::io::{self, BufRead};
 
 #[derive(Debug)]
 struct EarthquakeData {
-    magnitude: Option<f64>,            // (DIMENSIONLESS)
-    depth: Option<f64>,                // KM
-    delta: Option<f64>,                // KM
-    sensitivity: Option<f64>,          // GAL/MM
-    instrument_period: Option<f64>,    // SEC
-    damping: Option<f64>,              // PERCENT
-    duration_time: Option<f64>,        // SEC
-    peak_acceleration: Option<f64>,    // CM/SEC/SEC
-    peak_velocity: Option<f64>,        // CM/SEC
-    peak_displacement: Option<f64>,    // CM
-    initial_velocity: Option<f64>,     // CM/SEC
-    initial_displacement: Option<f64>, // CM
+    magnitude: Option<f64>,               // (DIMENSIONLESS)
+    depth: Option<f64>,                   // KM
+    delta: Option<f64>,                   // KM
+    sensitivity: Option<f64>,             // GAL/MM
+    instrument_period: Option<f64>,       // SEC
+    damping: Option<f64>,                 // PERCENT
+    duration_time: Option<f64>,           // SEC
+    peak_acceleration: Option<f64>,       // CM/SEC/SEC
+    peak_velocity: Option<f64>,           // CM/SEC
+    peak_displacement: Option<f64>,       // CM
+    initial_velocity: Option<f64>,        // CM/SEC
+    initial_displacement: Option<f64>,    // CM
+    equally_spaced_interval: Option<f64>, // SEC
 }
 
 impl EarthquakeData {
@@ -33,16 +34,37 @@ impl EarthquakeData {
             peak_displacement: None,
             initial_velocity: None,
             initial_displacement: None,
+            equally_spaced_interval: None,
         }
     }
 }
 
-fn parse_kv_f64(line: &str, key: &str) -> Option<f64> {
-    let regex = Regex::new(format!(r"{}\s*=\s*{}", key, r"(-?\d+\.?\d*)").as_str()).unwrap();
+const REGEX_F64: &str = r"(-?\d+\.?\d*)";
+
+fn parse_kv_f64(line: &str, key: &str, separator: Option<&str>) -> Option<f64> {
+    let regex =
+        Regex::new(format!(r"{}\s*{}\s*{}", key, separator.unwrap_or(" "), REGEX_F64).as_str())
+            .unwrap();
     if let Some(caps) = regex.captures(line) {
         if let Ok(value) = caps[1].parse() {
             return Some(value);
         }
+    }
+
+    None
+}
+
+fn parse_kv_separated_equal_f64(line: &str, key: &str) -> Option<f64> {
+    if let Some(value) = parse_kv_f64(line, key, Some("=")) {
+        return Some(value);
+    }
+
+    None
+}
+
+fn parse_kv_separated_space_f64(line: &str, key: &str) -> Option<f64> {
+    if let Some(value) = parse_kv_f64(line, key, None) {
+        return Some(value);
     }
 
     None
@@ -57,40 +79,49 @@ fn parse_earthquake_data(file_path: &str) -> io::Result<EarthquakeData> {
         for line in reader.lines() {
             if let Ok(line) = line {
                 if let None = data.magnitude {
-                    data.magnitude = parse_kv_f64(&line, "MAGNITUDE");
+                    data.magnitude = parse_kv_separated_equal_f64(&line, "MAGNITUDE");
                 }
                 if let None = data.depth {
-                    data.depth = parse_kv_f64(&line, "DEPTH");
+                    data.depth = parse_kv_separated_equal_f64(&line, "DEPTH");
                 }
                 if let None = data.delta {
-                    data.delta = parse_kv_f64(&line, "DELTA");
+                    data.delta = parse_kv_separated_equal_f64(&line, "DELTA");
                 }
                 if let None = data.sensitivity {
-                    data.sensitivity = parse_kv_f64(&line, "SENSITIVITY");
+                    data.sensitivity = parse_kv_separated_equal_f64(&line, "SENSITIVITY");
                 }
                 if let None = data.instrument_period {
-                    data.instrument_period = parse_kv_f64(&line, "INSTRUMENT PERIOD");
+                    data.instrument_period =
+                        parse_kv_separated_equal_f64(&line, "INSTRUMENT PERIOD");
                 }
                 if let None = data.damping {
-                    data.damping = parse_kv_f64(&line, "DAMPING");
+                    data.damping = parse_kv_separated_equal_f64(&line, "DAMPING");
                 }
                 if let None = data.duration_time {
-                    data.duration_time = parse_kv_f64(&line, "DURATION TIME");
+                    data.duration_time = parse_kv_separated_equal_f64(&line, "DURATION TIME");
                 }
                 if let None = data.peak_acceleration {
-                    data.peak_acceleration = parse_kv_f64(&line, "PEAK ACCELERATION");
+                    data.peak_acceleration =
+                        parse_kv_separated_equal_f64(&line, "PEAK ACCELERATION");
                 }
                 if let None = data.peak_velocity {
-                    data.peak_velocity = parse_kv_f64(&line, "PEAK VELOCITY");
+                    data.peak_velocity = parse_kv_separated_equal_f64(&line, "PEAK VELOCITY");
                 }
                 if let None = data.peak_displacement {
-                    data.peak_displacement = parse_kv_f64(&line, "PEAK DISPLACEMENT");
+                    data.peak_displacement =
+                        parse_kv_separated_equal_f64(&line, "PEAK DISPLACEMENT");
                 }
                 if let None = data.initial_velocity {
-                    data.initial_velocity = parse_kv_f64(&line, "INITIAL VELOCITY");
+                    data.initial_velocity = parse_kv_separated_equal_f64(&line, "INITIAL VELOCITY");
                 }
                 if let None = data.initial_displacement {
-                    data.initial_displacement = parse_kv_f64(&line, "INITIAL DISP.");
+                    data.initial_displacement =
+                        parse_kv_separated_equal_f64(&line, "INITIAL DISP.");
+                }
+
+                if let None = data.equally_spaced_interval {
+                    data.equally_spaced_interval =
+                        parse_kv_separated_space_f64(&line, "AT EQUALLY-SPACED INTERVALS OF");
                 }
             }
         }
